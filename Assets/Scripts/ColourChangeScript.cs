@@ -6,6 +6,9 @@ public class ColourChangeScript : MonoBehaviour
     [Header("Colour World Manager")]
     [SerializeField] private ColorWorldManager colorWorldManager;
 
+    [Header("Player (for sprite change)")]
+    [SerializeField] private PlayerController player;
+
     [Header("Current active colour")]
     [SerializeField] private PlatformColor currentColor = PlatformColor.Blue;
 
@@ -13,6 +16,9 @@ public class ColourChangeScript : MonoBehaviour
     {
         if (colorWorldManager != null)
             colorWorldManager.ShowOnly(currentColor);
+
+        if (player != null)
+            player.SetColor(currentColor);
     }
 
     void Update()
@@ -30,6 +36,8 @@ public class ColourChangeScript : MonoBehaviour
         currentColor = colour;
         if (colorWorldManager != null)
             colorWorldManager.ShowOnly(currentColor);
+        if (player != null)
+            player.SetColor(currentColor);
     }
 
     public PlatformColor GetCurrentColour() => currentColor;
