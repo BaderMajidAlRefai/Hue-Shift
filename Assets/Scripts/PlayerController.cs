@@ -33,7 +33,7 @@ public class PlayerController : MonoBehaviour
     private float coyoteTimer;
     private float jumpBufferTimer;
     private float baseGravity;
-    private PlatformColor currentColor = PlatformColor.Red;
+    private PlatformColor currentColor = PlatformColor.Neutral;
     private PlayerAnimState currentAnimState;
     private bool facingRight = true;
     private enum PlayerAnimState { Idle, Walking, Jumping }
@@ -162,10 +162,11 @@ public class PlayerController : MonoBehaviour
     {
         PlayerSpriteSet set = currentColor switch
         {
-            PlatformColor.Red    => redSprites,
-            PlatformColor.Yellow => yellowSprites,
-            PlatformColor.Blue   => blueSprites,
-            _                    => neutralSprites,
+            PlatformColor.Neutral => neutralSprites,
+            PlatformColor.Red     => redSprites,
+            PlatformColor.Yellow  => yellowSprites,
+            PlatformColor.Blue    => blueSprites,
+            _                     => neutralSprites,
         };
         Sprite sprite = currentAnimState switch
         {

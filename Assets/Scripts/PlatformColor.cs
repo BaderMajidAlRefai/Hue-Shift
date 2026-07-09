@@ -2,5 +2,6 @@ public enum PlatformColor
 {
     Blue,
     Yellow,
-    Red
+    Red,
+    Neutral
 }

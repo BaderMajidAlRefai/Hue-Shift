@@ -10,7 +10,7 @@ public class ColourChangeScript : MonoBehaviour
     [SerializeField] private PlayerController player;
 
     [Header("Current active colour")]
-    [SerializeField] private PlatformColor currentColor = PlatformColor.Blue;
+    [SerializeField] private PlatformColor currentColor = PlatformColor.Neutral;
 
     void Start()
     {
@@ -26,6 +26,7 @@ public class ColourChangeScript : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard == null) return;
 
+        if (keyboard.digit0Key.wasPressedThisFrame) SelectColour(PlatformColor.Neutral);
         if (keyboard.digit1Key.wasPressedThisFrame) SelectColour(PlatformColor.Blue);
         if (keyboard.digit2Key.wasPressedThisFrame) SelectColour(PlatformColor.Yellow);
         if (keyboard.digit3Key.wasPressedThisFrame) SelectColour(PlatformColor.Red);
