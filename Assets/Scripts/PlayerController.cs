@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 [RequireComponent(typeof(Rigidbody2D), typeof(BoxCollider2D), typeof(SpriteRenderer))]
 public class PlayerController : MonoBehaviour
 {
@@ -10,7 +11,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float deceleration = 35f;
     [Header("Jump")]
     [SerializeField] private float jumpForce = 12f;
-    [SerializeField] private float fallGravityMultiplier = 2.5f;
+    [SerializeField] private float fallGravityMultiplier = 4f;
     [SerializeField] private float lowJumpGravityMultiplier = 3f;
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBufferTime = 0.1f;
@@ -83,6 +84,8 @@ public class PlayerController : MonoBehaviour
             sprintInput = kb.shiftKey.isPressed;
             if (kb.spaceKey.wasPressedThisFrame)
                 jumpBufferTimer = jumpBufferTime;
+            if (kb.rKey.wasPressedThisFrame)
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
         if (jumpBufferTimer > 0f)
             jumpBufferTimer -= Time.deltaTime;
