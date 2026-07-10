@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.SceneManagement;
 [RequireComponent(typeof(Rigidbody2D), typeof(BoxCollider2D), typeof(SpriteRenderer))]
 public class PlayerController : MonoBehaviour
@@ -24,6 +25,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private PlayerSpriteSet redSprites;
     [SerializeField] private PlayerSpriteSet blueSprites;
     [SerializeField] private PlayerSpriteSet yellowSprites;
+    [Header("Sounds")]
+    [SerializeField] private float walkSoundCooldown = 0.3f;
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private Collider2D playerCollider;
@@ -37,6 +40,12 @@ public class PlayerController : MonoBehaviour
     private PlayerAnimState currentAnimState;
     private bool facingRight = true;
     private enum PlayerAnimState { Idle, Walking, Jumping }
+    private AudioSource audioSource;
+    private AudioClip walkSound;
+    private AudioClip jumpSound;
+    private AudioClip landSound;
+    private float walkSoundTimer;
+    private bool wasGrounded;
     [System.Serializable]
     private struct PlayerSpriteSet
     {
@@ -49,6 +58,12 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         playerCollider = GetComponent<Collider2D>();
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+        walkSound = Resources.Load<AudioClip>("Audio/step1");
+        jumpSound = Resources.Load<AudioClip>("Audio/jumping");
+        landSound = Resources.Load<AudioClip>("Audio/landing");
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         rb.gravityScale = 1f;
@@ -75,18 +90,86 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         Keyboard kb = Keyboard.current;
-        if (kb != null)
+        Gamepad gp = GetGamepad();
+        Joystick js = GetJoystick();
+
+        float horizontal = 0f;
+        bool usingController = false;
+
+        if (gp != null)
         {
-            float horizontal = 0f;
+            if (gp.leftStick.left.isPressed || gp.dpad.left.isPressed) { horizontal -= 1f; usingController = true; }
+            if (gp.leftStick.right.isPressed || gp.dpad.right.isPressed) { horizontal += 1f; usingController = true; }
+            if (gp.aButton.wasPressedThisFrame || gp.dpad.down.wasPressedThisFrame)
+                jumpBufferTimer = jumpBufferTime;
+        }
+
+        if (js != null && !usingController)
+        {
+            if (js.stick.left.isPressed) { horizontal -= 1f; usingController = true; }
+            if (js.stick.right.isPressed) { horizontal += 1f; usingController = true; }
+        }
+
+        if (js != null && js.stick.up != null && js.stick.up.wasPressedThisFrame)
+            jumpBufferTimer = jumpBufferTime;
+
+        if (gp == null && js == null)
+        {
+            foreach (var device in InputSystem.devices)
+            {
+                if (device is Keyboard || device is Gamepad || device is Joystick) continue;
+                foreach (var child in device.children)
+                {
+                    if (child is ButtonControl btn && !btn.synthetic && btn.wasPressedThisFrame)
+                    {
+                        jumpBufferTimer = jumpBufferTime;
+                        goto foundJump;
+                    }
+                }
+            }
+            foundJump:;
+        }
+
+        if (!usingController)
+        {
+            foreach (var device in InputSystem.devices)
+            {
+                if (device is Keyboard) continue;
+                if (device is Gamepad || device is Joystick) continue;
+                foreach (var child in device.children)
+                {
+                    if (child is StickControl stick)
+                    {
+                        Vector2 val = stick.ReadValue();
+                        if (Mathf.Abs(val.x) > 0.3f)
+                        {
+                            horizontal = Mathf.Clamp(val.x, -1f, 1f);
+                            usingController = true;
+                            break;
+                        }
+                    }
+                }
+                if (usingController) break;
+            }
+        }
+
+        if (!usingController && kb != null)
+        {
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed)  horizontal -= 1f;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) horizontal += 1f;
-            moveInput = horizontal;
-            sprintInput = kb.shiftKey.isPressed;
+        }
+
+        if (kb != null)
+        {
             if (kb.spaceKey.wasPressedThisFrame)
                 jumpBufferTimer = jumpBufferTime;
             if (kb.rKey.wasPressedThisFrame)
                 SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
+
+        moveInput = horizontal;
+        sprintInput = kb != null && kb.shiftKey.isPressed;
+
         if (jumpBufferTimer > 0f)
             jumpBufferTimer -= Time.deltaTime;
         if (isGrounded)
@@ -110,6 +193,25 @@ public class PlayerController : MonoBehaviour
             currentAnimState = newState;
             UpdateSprite();
         }
+
+        if (isGrounded && Mathf.Abs(moveInput) > 0.1f)
+        {
+            walkSoundTimer -= Time.deltaTime;
+            if (walkSoundTimer <= 0f)
+            {
+                PlaySound(walkSound, 0.8f);
+                walkSoundTimer = walkSoundCooldown;
+            }
+        }
+        else
+        {
+            walkSoundTimer = 0f;
+        }
+
+        if (isGrounded && !wasGrounded)
+            PlaySound(landSound, 0.4f);
+
+        wasGrounded = isGrounded;
     }
     void FixedUpdate()
     {
@@ -124,12 +226,13 @@ public class PlayerController : MonoBehaviour
             rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
             jumpBufferTimer = 0f;
             coyoteTimer = 0f;
+            PlaySound(jumpSound, 0.2f);
         }
         if (rb.linearVelocity.y < 0f)
         {
             rb.gravityScale = baseGravity * fallGravityMultiplier;
         }
-        else if (rb.linearVelocity.y > 0f && Keyboard.current != null && !Keyboard.current.spaceKey.isPressed)
+        else if (rb.linearVelocity.y > 0f && !IsJumpHeld())
         {
             rb.gravityScale = baseGravity * lowJumpGravityMultiplier;
         }
@@ -190,4 +293,45 @@ public class PlayerController : MonoBehaviour
     public float GetMoveInput() => moveInput;
     public Rigidbody2D GetRigidbody() => rb;
     public PlatformColor GetCurrentColor() => currentColor;
+
+    private void PlaySound(AudioClip clip, float volume = 1f)
+    {
+        if (clip != null && audioSource != null)
+            audioSource.PlayOneShot(clip, volume);
+    }
+
+    private bool IsJumpHeld()
+    {
+        if (Keyboard.current != null && Keyboard.current.spaceKey.isPressed) return true;
+        Gamepad gp = GetGamepad();
+        if (gp != null && gp.aButton.isPressed) return true;
+        Joystick js = GetJoystick();
+        if (js != null && js.stick.up != null && js.stick.up.isPressed) return true;
+        foreach (var device in InputSystem.devices)
+        {
+            if (device is Keyboard || device is Gamepad || device is Joystick) continue;
+            foreach (var child in device.children)
+            {
+                if (child is ButtonControl btn && !btn.synthetic && btn.isPressed)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static Gamepad GetGamepad()
+    {
+        if (Gamepad.current != null) return Gamepad.current;
+        foreach (var device in InputSystem.devices)
+            if (device is Gamepad gp) return gp;
+        return null;
+    }
+
+    private static Joystick GetJoystick()
+    {
+        if (Joystick.current != null) return Joystick.current;
+        foreach (var device in InputSystem.devices)
+            if (device is Joystick js) return js;
+        return null;
+    }
 }

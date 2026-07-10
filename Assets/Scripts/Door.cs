@@ -56,10 +56,18 @@ public class Door : MonoBehaviour
     }
     private bool WasInteractPressed()
     {
-        Keyboard kb = Keyboard.current;
-        if (kb != null)
-            return kb.eKey.wasPressedThisFrame;
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) return true;
+        var gp = GetGamepad();
+        if (gp != null && gp.dpad.up.wasPressedThisFrame) return true;
         return Input.GetKeyDown(legacyInteractKey);
+    }
+
+    private static Gamepad GetGamepad()
+    {
+        if (Gamepad.current != null) return Gamepad.current;
+        foreach (var device in InputSystem.devices)
+            if (device is Gamepad gp) return gp;
+        return null;
     }
     private void LoadNextScene()
     {

@@ -54,7 +54,7 @@ public class Enemy : MonoBehaviour
     {
         if (player == null) return;
 
-        isActive = player.GetCurrentColor() == enemyColor;
+        isActive = enemyColor == PlatformColor.Neutral || player.GetCurrentColor() == enemyColor;
 
         if (isActive)
         {
@@ -63,7 +63,8 @@ public class Enemy : MonoBehaviour
                 SetMovingSprite();
             else
                 SetIdleSprite();
-            spriteRenderer.flipX = player.transform.position.x > transform.position.x;
+            if (enemyColor != PlatformColor.Neutral)
+              spriteRenderer.flipX = player.transform.position.x > transform.position.x;
         }
         else
         {
